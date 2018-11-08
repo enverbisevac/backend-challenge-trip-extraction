@@ -11,7 +11,7 @@ Interfaces
 
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
-from typing import Union, NamedTuple, Tuple
+from typing import Union, NamedTuple, Tuple, List
 
 from geopy import distance
 
@@ -26,6 +26,7 @@ class Waypoint(NamedTuple):
     lng: float
 
     def get_time_diff(self, waypoint: 'Waypoint') -> int:
+        """Get time difference in seconds """
         return (self.timestamp - waypoint.timestamp).seconds
 
     def get_speed(self, waypoint: 'Waypoint') -> float:
@@ -70,7 +71,7 @@ class ListProcessor(metaclass=ABCMeta): # pylint: disable=too-few-public-methods
         self._waypoints = waypoints
 
     @abstractmethod
-    def get_trips(self) -> Tuple[Trip]:
+    def get_trips(self) -> Tuple[Trip, ...]:
         """
         This function returns a list of Trips, which is derived from
         the list of waypoints, passed to the instance on initialization.
@@ -94,3 +95,18 @@ class StreamProcessor(metaclass=ABCMeta): # pylint: disable=too-few-public-metho
         :param waypoint: Waypoint
         """
         pass
+
+
+class TripListGenerator(ListProcessor):
+    """
+    Extract and process information from waypoints
+    """
+
+    def _generate(self) -> Tuple[Trip, ...]:
+        """
+        generate trips
+        """
+        return []
+
+    def get_trips(self) -> Tuple[Trip, ...]:
+        return self._generate()

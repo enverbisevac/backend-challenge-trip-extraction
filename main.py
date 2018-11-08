@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""This is main app module for extracting data"""
+"""
+This is main app module for extracting data
+"""
 
 import json
 from typing import List
@@ -8,7 +10,9 @@ from utils import convert_to_datetime
 
 
 def load_json_waypoints(filename):
-    """Load file and convert it to Waypoints"""
+    """
+    Load file and convert it to Waypoints list of objects
+    """
     waypoints: List[Waypoint] = []
     with open(filename, 'r') as file_handle:
         waypoints = json.load(file_handle,

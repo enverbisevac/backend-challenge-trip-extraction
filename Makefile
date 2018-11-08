@@ -32,11 +32,13 @@ test: venv
 	${PYTHON} -m pytest
 
 lint: venv
-	${PYTHON} -m pylint main.py processor.py utils.py
-	${PYTHON} -m mypy main.py processor.py utils.py
+	${PYTHON} -m pylint main.py processor.py utils.py settings.py \
+				main_test.py processor_test.py utils_test.py
+	${PYTHON} -m mypy main.py processor.py utils.py \
+				main_test.py processor_test.py utils_test.py
 
 run: venv
-	${PYTHON} app.py
+	${PYTHON} main.py
 
 doc: venv
 	$(VENV_ACTIVATE) &amp;&amp; cd docs; make html
