@@ -27,6 +27,8 @@ class Waypoint(NamedTuple):
 
     def get_time_diff(self, waypoint: 'Waypoint') -> int:
         """Get time difference in seconds """
+        if waypoint is None:
+            return 0
         return (self.timestamp - waypoint.timestamp).seconds
 
     def get_speed(self, waypoint: 'Waypoint') -> float:
@@ -71,7 +73,7 @@ class ListProcessor(metaclass=ABCMeta): # pylint: disable=too-few-public-methods
         self._waypoints = waypoints
 
     @abstractmethod
-    def get_trips(self) -> Tuple[Trip, ...]:
+    def get_trips(self) -> Tuple[Trip]:
         """
         This function returns a list of Trips, which is derived from
         the list of waypoints, passed to the instance on initialization.
@@ -102,11 +104,40 @@ class TripListGenerator(ListProcessor):
     Extract and process information from waypoints
     """
 
-    def _generate(self) -> Tuple[Trip, ...]:
+    def _generate(self) -> Tuple[Trip]:
         """
         generate trips
         """
-        return []
+        trips: List[Trip] = []
+        if self._waypoints is None or self._waypoints == ():
+            return tuple(trips)
 
-    def get_trips(self) -> Tuple[Trip, ...]:
+        prev_waypoint: Waypoint = None
+        start = None
+        trip_distance = 0.0
+        for waypoint in self._waypoints:
+            # ignore distances lower than 15 m
+            distance = waypoint.get_distance(prev_waypoint)
+            if distance < 15:
+                if prev_waypoint is None:
+                    prev_waypoint = waypoint
+                
+                if start is not None and waypoint.get_time_diff(prev_waypoint) >= 180:
+                    trips.append(Trip(start=start, end=prev_waypoint, distance=trip_distance))
+                    prev_waypoint = None
+                    start = None
+                continue
+            
+            if trip_distance >= 15 and start is None:
+                start = prev_waypoint
+            # set to prev current_waypoint
+            prev_waypoint = waypoint
+            trip_distance += distance
+        return trips
+
+    def get_trips(self) -> Tuple[Trip]:
         return self._generate()
+
+    def _calculate_jumped_distance(self, start: Waypoint, end: Waypoint) -> float:
+        print("jumped")
+        return 0.00

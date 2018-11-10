@@ -3,10 +3,25 @@
 This is main app module for extracting data
 """
 
+import sys
 import json
-from typing import List
-from processor import Waypoint
+from typing import List, NamedTuple
+import datetime
+from processor import Waypoint, TripListGenerator, Trip
 from utils import convert_to_datetime
+
+
+class MyEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        elif isinstance(obj, datetime.date):
+            return obj.isoformat()
+        elif isinstance(obj, datetime.timedelta):
+            return (datetime.datetime.min + obj).time().isoformat()
+        else:
+            return super(MyEncoder, self).default(obj)
 
 
 def load_json_waypoints(filename):
@@ -22,4 +37,7 @@ def load_json_waypoints(filename):
 
 
 if __name__ == "__main__":
-    pass
+    waypoints = load_json_waypoints(sys.argv[1])
+    generator = TripListGenerator(waypoints)
+    print(waypoints[9].get_distance(waypoints[0]))
+    print(json.dumps(generator.get_trips(), indent=4, cls=MyEncoder))
