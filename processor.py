@@ -9,6 +9,7 @@ Interfaces
     - StreamProcessor
 """
 
+import copy
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from typing import Union, NamedTuple, Tuple, List
@@ -27,13 +28,13 @@ class Waypoint(NamedTuple):
 
     def get_time_diff(self, waypoint: 'Waypoint') -> int:
         """Get time difference in seconds """
-        if waypoint is None:
+        if waypoint is None or self is waypoint:
             return 0
         return (self.timestamp - waypoint.timestamp).seconds
 
     def get_speed(self, waypoint: 'Waypoint') -> float:
         """Calculate speed based on previous waypoint"""
-        if waypoint is None:
+        if waypoint is None or self is waypoint:
             return 0.0
         distance_km: float = self.get_distance(waypoint) / 1000
         diff_time_h: float = self.get_time_diff(waypoint) / 60 / 60
@@ -41,7 +42,7 @@ class Waypoint(NamedTuple):
 
     def get_distance(self, waypoint: 'Waypoint') -> float:
         """Calculate distance based on previous waypoint"""
-        if waypoint is None:
+        if waypoint is None or self is waypoint:
             return 0.0
         coords_a = (self.lat, self.lng)
         coords_b = (waypoint.lat, waypoint.lng)
@@ -113,23 +114,31 @@ class TripListGenerator(ListProcessor):
             return tuple(trips)
 
         prev_waypoint: Waypoint = None
+        real_prev_point = self._waypoints[0]
         start = None
         trip_distance = 0.0
         for waypoint in self._waypoints:
+            
+            # remove distances == 0 (noises)
+            real_distance = waypoint.get_distance(real_prev_point)
+            if real_distance == 0.0:
+                continue
+            real_prev_point = waypoint
             # ignore distances lower than 15 m
+            if prev_waypoint is None:
+                prev_waypoint = waypoint
+
             distance = waypoint.get_distance(prev_waypoint)
-            if distance < 15:
-                if prev_waypoint is None:
+            if waypoint.get_speed(prev_waypoint) < 1:
+                if waypoint.get_time_diff(prev_waypoint) >= 180:
                     prev_waypoint = waypoint
-                
-                if start is not None and waypoint.get_time_diff(prev_waypoint) >= 180:
-                    trips.append(Trip(start=start, end=prev_waypoint, distance=trip_distance))
-                    prev_waypoint = None
-                    start = None
+                    if start is not None:
+                        trips.append(Trip(start=start, end=prev_waypoint, distance=trip_distance))
+                        start = None
                 continue
             
-            if trip_distance >= 15 and start is None:
-                start = prev_waypoint
+            if start is None:
+                start = real_prev_point
             # set to prev current_waypoint
             prev_waypoint = waypoint
             trip_distance += distance

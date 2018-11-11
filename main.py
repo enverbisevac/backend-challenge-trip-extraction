@@ -39,5 +39,8 @@ def load_json_waypoints(filename):
 if __name__ == "__main__":
     waypoints = load_json_waypoints(sys.argv[1])
     generator = TripListGenerator(waypoints)
-    print(waypoints[9].get_distance(waypoints[0]))
     print(json.dumps(generator.get_trips(), indent=4, cls=MyEncoder))
+    # prev = None
+    # for waypoint in waypoints:
+    #     print(waypoint.timestamp, waypoint.get_distance(prev))
+    #     prev = waypoint
