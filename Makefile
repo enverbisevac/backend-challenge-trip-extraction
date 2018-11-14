@@ -34,7 +34,7 @@ test: venv
 lint: venv
 	${PYTHON} -m pylint main.py processor.py utils.py settings.py \
 				main_test.py processor_test.py utils_test.py
-	${PYTHON} -m mypy main.py processor.py utils.py \
+	${PYTHON} -m mypy main.py processor.py utils.py settings.py \
 				main_test.py processor_test.py utils_test.py
 
 run: venv

@@ -14,7 +14,7 @@ import unittest
 #local modules
 from settings import WAYPOINTS_TEST_FILE, TRIPS_TEST_FILE
 from processor import Waypoint
-from main import load_json_waypoints
+from main import load_waypoints_from_json
 
 
 class TestMainMethods(unittest.TestCase):
@@ -37,4 +37,4 @@ class TestMainMethods(unittest.TestCase):
 
     def test_waypoints(self): # pylint: disable=no-self-use
         """testing loading of waypoints from json file"""
-        assert load_json_waypoints(WAYPOINTS_TEST_FILE) not in (None, [])
+        assert load_waypoints_from_json(WAYPOINTS_TEST_FILE) not in (None, [])

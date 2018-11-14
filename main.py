@@ -5,28 +5,28 @@ This is main app module for extracting data
 
 import sys
 import json
-from typing import List, NamedTuple
 import datetime
-from processor import Waypoint, TripListGenerator, Trip
+from typing import List, Tuple, Dict, Union
+
+from processor import Waypoint, ListProcessor, TripListGenerator, Trip
 from utils import convert_to_datetime
+from settings import DEFAULT_OUTPUT_FILE
 
 
-class MyEncoder(json.JSONEncoder):
-
-    def default(self, obj):
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.date):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.timedelta):
-            return (datetime.datetime.min + obj).time().isoformat()
-        else:
-            return super(MyEncoder, self).default(obj)
+def default(data: datetime.datetime) -> Union[str, None]:
+    """Converting datetime to string using iso format
+    this function is needed for json library
+    """
+    if isinstance(data, (datetime.date, datetime.datetime)):
+        return data.isoformat()
+    return None
 
 
-def load_json_waypoints(filename):
+def load_waypoints_from_json(filename):
     """
     Load file and convert it to Waypoints list of objects
+
+    :filename: str
     """
     waypoints: List[Waypoint] = []
     with open(filename, 'r') as file_handle:
@@ -36,11 +36,36 @@ def load_json_waypoints(filename):
     return waypoints
 
 
+def save_trips_to_json(trips: Tuple[Trip, ...], filename: Union[str, None] = None):
+    """
+    Saving trips to json file format
+
+    :param trips: Tuple[Trip]
+    :filename: str
+    """
+    if filename is None:
+        filename = DEFAULT_OUTPUT_FILE
+    _trips: List[Dict] = []
+    for trip in trips:
+        _trips.append(trip._asdict())
+    with open(filename, 'w') as file_handle:
+        json.dump(_trips, file_handle, indent=4, default=default)
+
+
+def main(*args: str):
+    """
+    Main function
+    """
+    output: Union[str, None] = None
+    total_args = len(args)
+    if total_args < 2:
+        print("Usage: python3 main.py <input_file>")
+        sys.exit(1)
+    if total_args > 2:
+        output = args[2]
+    waypoints = load_waypoints_from_json(args[1])
+    generator: ListProcessor = TripListGenerator(waypoints)
+    save_trips_to_json(generator.get_trips(), output)
+
 if __name__ == "__main__":
-    waypoints = load_json_waypoints(sys.argv[1])
-    generator = TripListGenerator(waypoints)
-    print(json.dumps(generator.get_trips(), indent=4, cls=MyEncoder))
-    # prev = None
-    # for waypoint in waypoints:
-    #     print(waypoint.timestamp, waypoint.get_distance(prev))
-    #     prev = waypoint
+    main(*sys.argv)

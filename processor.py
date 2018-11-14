@@ -9,13 +9,13 @@ Interfaces
     - StreamProcessor
 """
 
-import copy
 import json
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from typing import Union, NamedTuple, Tuple, List
 
-from geopy import distance
+from geopy import distance as geopy_distance
+from settings import MINIMUM_SPEED, MINIMUM_TIME, MINIMUM_DISTANCE
 
 
 class Waypoint(NamedTuple):
@@ -27,29 +27,29 @@ class Waypoint(NamedTuple):
     lat: float
     lng: float
 
-    def get_time_diff(self, waypoint: 'Waypoint') -> int:
+    def get_time_diff(self, waypoint: Union['Waypoint', None]) -> int:
         """Get time difference in seconds """
         if waypoint is None or self is waypoint:
             return 0
         return (self.timestamp - waypoint.timestamp).seconds
 
-    def get_speed(self, waypoint: 'Waypoint') -> float:
+    def get_speed(self, waypoint: Union['Waypoint', None]) -> float:
         """Calculate speed based on previous waypoint"""
         if waypoint is None or self is waypoint:
             return 0.0
         distance_km: float = self.get_distance(waypoint) / 1000
-        diff_time_h: float = self.get_time_diff(waypoint) / 60 / 60
+        diff_time_h: float = self.get_time_diff(waypoint) / 3600
         if diff_time_h == 0.0:
             return 0.0
         return distance_km / diff_time_h
 
-    def get_distance(self, waypoint: 'Waypoint') -> float:
+    def get_distance(self, waypoint: Union['Waypoint', None]) -> float:
         """Calculate distance based on previous waypoint"""
         if waypoint is None or self is waypoint:
             return 0.0
         coords_a = (self.lat, self.lng)
         coords_b = (waypoint.lat, waypoint.lng)
-        return float(distance.distance(coords_a, coords_b).m)
+        return float(geopy_distance.distance(coords_a, coords_b).m)
 
 
 class Trip(NamedTuple): # pylint: disable=too-few-public-methods
@@ -77,7 +77,7 @@ class ListProcessor(metaclass=ABCMeta): # pylint: disable=too-few-public-methods
         self._waypoints = waypoints
 
     @abstractmethod
-    def get_trips(self) -> Tuple[Trip]:
+    def get_trips(self) -> Tuple[Trip, ...]:
         """
         This function returns a list of Trips, which is derived from
         the list of waypoints, passed to the instance on initialization.
@@ -108,66 +108,74 @@ class TripListGenerator(ListProcessor):
     Extract and process information from waypoints
     """
 
-    def _generate(self) -> Tuple[Trip]:
+    def __init__(self, waypoints: Tuple[Waypoint]):
+        super(TripListGenerator, self).__init__(waypoints)
+        self._trips: List[Trip] = []
+        if waypoints is not None:
+            self.set_waypoints(waypoints)
+
+    def set_waypoints(self, waypoints: Tuple[Waypoint]):
+        """ Setter method for waypoints """
+        self._waypoints = waypoints
+        self._generate()
+
+    def _generate(self, debug: bool = False):
         """
         generate trips
         """
         new_waypoints = []
-        trips: List[Trip] = []
-        if self._waypoints is None or self._waypoints == ():
-            return tuple(trips)
-
         trip_distance = 0.0
         prev_index = 0
-        start = None
-        filtered_waypoints = []
+        speed_waypoints = []
         for i in range(1, len(self._waypoints)):
             waypoint = self._waypoints[i]
             real_distance = waypoint.get_distance(self._waypoints[i-1])
             # remove distances lower than 15 m
-            if real_distance < 15:
-                continue
-            filtered_waypoints.append(waypoint)
-
-        speed_waypoints = []
-        prev = None
-        for waypoint in filtered_waypoints:
-            # clean by speed
-            current_speed = waypoint.get_speed(prev)
-            if current_speed <= (15 / 1000) / (180 / 60 / 60):
-                if prev is None or waypoint.get_time_diff(prev) >= 180:
-                    prev = waypoint
+            if real_distance < MINIMUM_DISTANCE:
                 continue
 
+            # cleaning jumps
+            # speed + short distance
+            # bearing + angle aproach
+            # or using Kalman filter (filters was not mentioned in README)
+            # end
+
+            current_speed = waypoint.get_speed(self._waypoints[prev_index])
+            if current_speed <= MINIMUM_SPEED:
+                if (self._waypoints[prev_index] is None or
+                        waypoint.get_time_diff(self._waypoints[prev_index]) >= MINIMUM_TIME):
+                    prev_index = i
+                continue
             speed_waypoints.append(waypoint)
-            
 
-        prev = None
-        start = speed_waypoints[0]
+
+        prev: Union[Waypoint, None] = None
+        start: Waypoint = speed_waypoints[0]
         for waypoint in speed_waypoints:
             current_speed = waypoint.get_speed(prev)
-            if waypoint.get_time_diff(prev) >= 180 and current_speed < 0.3:
-                trips.append(Trip(start=start, end=prev, distance=trip_distance))
+            distance = waypoint.get_distance(prev)
+            if (prev is not None and waypoint.get_time_diff(prev) >= MINIMUM_TIME and
+                    current_speed < MINIMUM_SPEED):
+                self._trips.append(Trip(start=start, end=prev, distance=round(trip_distance)))
                 start = waypoint
                 prev = waypoint
                 trip_distance = 0.0
                 continue
             trip_distance += waypoint.get_distance(prev)
             prev = waypoint
-            new_waypoints.append({
-                "lat": waypoint.lat,
-                "lng": waypoint.lng,
-                "timestamp": waypoint.timestamp.isoformat(),
-                "speed": current_speed
-            })
-        trips.append(Trip(start=start, end=prev, distance=trip_distance))
-        fp = open("./data/new_waypoints.json", "w")
-        json.dump(new_waypoints, fp, indent=4)
-        return trips
+            if debug:
+                new_waypoints.append({
+                    "lat": waypoint.lat,
+                    "lng": waypoint.lng,
+                    "timestamp": waypoint.timestamp.isoformat(),
+                    "speed": current_speed,
+                    "distance": distance
+                })
+        if prev is not None:
+            self._trips.append(Trip(start=start, end=prev, distance=round(trip_distance)))
+        if debug:
+            with open("./data/new_waypoints.json", "w") as file_handler:
+                json.dump(new_waypoints, file_handler, indent=4)
 
-    def get_trips(self) -> Tuple[Trip]:
-        return self._generate()
-
-    def _calculate_jumped_distance(self, start: Waypoint, end: Waypoint) -> float:
-        print("jumped")
-        return 0.00
+    def get_trips(self) -> Tuple[Trip, ...]:
+        return tuple(self._trips)

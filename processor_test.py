@@ -4,14 +4,12 @@ Classes:
 """
 
 import unittest
-import json
 from datetime import datetime
 from typing import List
 
 from processor import Waypoint, TripListGenerator, ListProcessor
-from main import load_json_waypoints
-from settings import WAYPOINTS_TEST_FILE, TRIPS_TEST_FILE
-from utils import convert_to_datetime
+from main import load_waypoints_from_json
+from settings import WAYPOINTS_TEST_FILE
 
 
 class TestWaypointMethods(unittest.TestCase):
@@ -20,7 +18,7 @@ class TestWaypointMethods(unittest.TestCase):
     """
 
     def setUp(self):
-        self.waypoints: List[Waypoint] = load_json_waypoints(WAYPOINTS_TEST_FILE)
+        self.waypoints: List[Waypoint] = load_waypoints_from_json(WAYPOINTS_TEST_FILE)
 
     def tearDown(self):
         self.waypoints[:] = []
@@ -67,12 +65,15 @@ class TestWaypointMethods(unittest.TestCase):
 
 class TestTripListGenerator(unittest.TestCase):
     """
-    Test
+    Test trip generator
     """
 
     def setUp(self):
-        waypoints: List[Waypoint] = load_json_waypoints(WAYPOINTS_TEST_FILE)
+        waypoints: List[Waypoint] = load_waypoints_from_json(WAYPOINTS_TEST_FILE)
         self.generator: ListProcessor = TripListGenerator(waypoints)
 
     def test_generator(self):
-        assert self.generator.get_trips() == []
+        """
+        Test generator method
+        """
+        assert self.generator.get_trips() != []
