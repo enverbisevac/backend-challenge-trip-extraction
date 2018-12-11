@@ -119,41 +119,51 @@ class TripListGenerator(ListProcessor):
         self._waypoints = waypoints
         self._generate()
 
-    def _generate(self, debug: bool = False):
+    def _generate(self, debug: bool = True):
         """
         generate trips
         """
         new_waypoints = []
-        trip_distance = 0.0
+        trip_distance: float = 0.0
         prev_index = 0
         speed_waypoints = []
         for i in range(1, len(self._waypoints)):
             waypoint = self._waypoints[i]
-            real_distance = waypoint.get_distance(self._waypoints[i-1])
+            real_distance = waypoint.get_distance(self._waypoints[prev_index])
             # remove distances lower than 15 m
             if real_distance < MINIMUM_DISTANCE:
                 continue
+            
+            # cleaning ends
+            prev_point = self._waypoints[prev_index]
+            current_speed = waypoint.get_speed(prev_point)
+            if current_speed <= MINIMUM_SPEED:
+                if waypoint.get_time_diff(prev_point) >= MINIMUM_TIME:
+                    prev_index = i
+                continue
+            print(i, current_speed, prev_index)
+
+            if speed_waypoints == []:
+                speed_waypoints.append(self._waypoints[prev_index])
 
             # cleaning jumps
             # speed + short distance
             # bearing + angle aproach
             # or using Kalman filter (filters was not mentioned in README)
-            # end
-
-            current_speed = waypoint.get_speed(self._waypoints[prev_index])
-            if current_speed <= MINIMUM_SPEED:
-                if (self._waypoints[prev_index] is None or
-                        waypoint.get_time_diff(self._waypoints[prev_index]) >= MINIMUM_TIME):
-                    prev_index = i
-                continue
+            # if len(speed_waypoints) > 1:
+            #     previous_speed = speed_waypoints[-1].get_speed(speed_waypoints[-2])
+            #     if previous_speed > 0.0:
+            #         part = (current_speed - previous_speed) * 100 / previous_speed
+            #         print(current_speed, previous_speed, part)
             speed_waypoints.append(waypoint)
-
 
         prev: Union[Waypoint, None] = None
         start: Waypoint = speed_waypoints[0]
-        for waypoint in speed_waypoints:
-            current_speed = waypoint.get_speed(prev)
-            distance = waypoint.get_distance(prev)
+        for i in range(1, len(speed_waypoints)):
+            waypoint = speed_waypoints[i]
+            current_speed = waypoint.get_speed(speed_waypoints[i-1])
+            distance = waypoint.get_distance(speed_waypoints[i-1])
+
             if (prev is not None and waypoint.get_time_diff(prev) >= MINIMUM_TIME and
                     current_speed < MINIMUM_SPEED):
                 self._trips.append(Trip(start=start, end=prev, distance=round(trip_distance)))
@@ -161,7 +171,7 @@ class TripListGenerator(ListProcessor):
                 prev = waypoint
                 trip_distance = 0.0
                 continue
-            trip_distance += waypoint.get_distance(prev)
+            trip_distance += distance
             prev = waypoint
             if debug:
                 new_waypoints.append({
